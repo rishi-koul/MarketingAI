@@ -1,12 +1,21 @@
 # MarketingAI
 
-This is a basic FastAPI server
+copy .env into each folder backend and frontend
 
-1. First activate the python virtual environment using:
-   `pipenv shell`
 
-2. You can get all dependencies from the Pipfile using:
-   `pipenv sync`
+terminal  q in backend folder
+python -m venv .venv && source .venv/bin/activate
 
-3. Then you can start the server using the command:
-   `fastapi dev main.py`
+pip install fastapi uvicorn python-dotenv httpx
+uvicorn app:app --port 8080 --reload
+
+terminal 2:
+
+ngrok config add-authtoken [ASK_ME]
+
+ngrok http 8080
+
+
+terminal 3 in frontend:
+
+npm run dev
