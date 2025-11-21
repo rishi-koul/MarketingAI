@@ -3,10 +3,11 @@
 copy .env into each folder backend and frontend
 
 
-terminal  q in backend folder
+terminal 1 in backend folder
 python -m venv .venv && source .venv/bin/activate
 
 pip install fastapi uvicorn python-dotenv httpx
+
 uvicorn app:app --port 8080 --reload
 
 terminal 2:
