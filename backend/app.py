@@ -21,17 +21,18 @@ load_dotenv()
 APP_SECRET = os.getenv("APP_SECRET", "")
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "")
 CLIENT_ID = os.getenv("CLIENT_ID", "")
-CLIENT_SECRET = os.getenv("CLIENT_SECRET", "")
-REDIRECT_URI = os.getenv("REDIRECT_URI", "")
+CLIENT_SECRET = APP_SECRET
 USER_DATA_FILE = os.getenv("USER_DATA_FILE", "users.json")
 BUSINESS_PROFILE_FILE = os.getenv("BUSINESS_PROFILE_FILE", "business_profile.json")
 GRAPH = "https://graph.facebook.com/v20.0"
 
 # Frontend origin (for local dev, adjust as needed)
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "")
+REDIRECT_URI = FRONTEND_ORIGIN + "/connect"
+
 
 app = FastAPI(title="Instagram Marketing AI")
-
+print(FRONTEND_ORIGIN)
 if FRONTEND_ORIGIN:
     app.add_middleware(
         CORSMiddleware,
@@ -43,10 +44,18 @@ if FRONTEND_ORIGIN:
 
 # ==================== PERSISTENCE (very simple) ====================
 def load_users() -> Dict[str, Any]:
-    if Path(USER_DATA_FILE).exists():
-        with open(USER_DATA_FILE, "r") as f:
-            return json.load(f)
-    return {}
+    p = Path(USER_DATA_FILE)
+    if not p.exists():
+        return {}
+    try:
+        text = p.read_text().strip()
+        if not text:
+            return {}
+        return json.loads(text)
+    except Exception as e:
+        # Log and reset to empty so /health doesn't 500
+        print(f"⚠️ users.json unreadable ({p}): {e}; treating as empty.")
+        return {}
 
 def save_users(users: Dict[str, Any]) -> None:
     with open(USER_DATA_FILE, "w") as f:
@@ -363,7 +372,7 @@ async def oauth_exchange(
         value=sid,
         httponly=True,
         secure=True,
-        samesite="lax",
+        samesite="none",
         max_age=60 * 60 * 24 * 7,
         path="/",
     )
@@ -380,6 +389,7 @@ async def list_pages(session=Depends(require_session)):
         "me/accounts",
         {"access_token": user_access_token, "fields": "id,name,category,instagram_business_account"},
     )
+    print(data)
     pages = []
     for p in data.get("data", []):
         ig = p.get("instagram_business_account")
@@ -541,3 +551,35 @@ async def info():
         },
         "connected_users": len(load_users()),
     }
+
+
+@app.get("/debug/token")
+async def debug_token(session=Depends(require_session)):
+    user_token = session["user_access_token"]
+    app_access = f"{CLIENT_ID}|{CLIENT_SECRET}"
+    data = await graph_get(
+        "debug_token",
+        {"input_token": user_token, "access_token": app_access},
+    )
+    return data  # look at data["data"]["scopes"], "is_valid"
+
+@app.get("/debug/me_accounts")
+async def debug_me_accounts(session=Depends(require_session)):
+    user_token = session["user_access_token"]
+    return await graph_get(
+        "me/accounts",
+        {"access_token": user_token, "fields": "id,name,perms,instagram_business_account"},
+    )
+
+@app.get("/debug/me")
+async def debug_me(session=Depends(require_session)):
+    return await graph_get("me", {"access_token": session["user_access_token"], "fields": "id,name"})
+
+
+@app.get("/debug/page_access")
+async def debug_page_access(session=Depends(require_session)):
+    return await graph_get(
+        "871581699375552",
+        {"fields": "name,instagram_business_account,access_token",
+         "access_token": session["user_access_token"]}
+    )
